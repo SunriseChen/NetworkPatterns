@@ -1,0 +1,112 @@
+# -*- coding: utf-8 -*-
+
+import os
+import atexit
+
+#### 项目设置开始 ####
+
+# 要创建的可执行文件的名称
+PROGRAM_NAME = 'NetworkPatterns'
+
+# 项目中使用的源文件扩展名
+SRC_EXT = 'cpp'
+
+COMPILER = 'g++'
+if COMPILER == 'msvc':
+    TOOLS = ['default']
+
+    # 一般的编译选项
+    # https://msdn.microsoft.com/zh-cn/library/fwkeyyhe.aspx
+    COMPILE_FLAGS = ['/EHsc', '/W4', '/WX', '-D_WIN32_WINNT=0x0501']
+    # 附加的 Release 编译选项
+    RELEASE_COMPILE_FLAGS = ['/MD', '/Ox']
+    # 附加的 Debug 编译选项
+    DEBUG_COMPILE_FLAGS = ['/MDd', '/Od', '/Zi']
+
+    # 一般的连接选项
+    # https://msdn.microsoft.com/zh-cn/library/y0zzbyt4.aspx
+    LINK_FLAGS = ['']
+    # 附加的 Release 连接选项
+    RELEASE_LINK_FLAGS = ['']
+    # 附加的 Debug 连接选项
+    DEBUG_LINK_FLAGS = ['']
+else:
+    # 参考：https://gcc.gnu.org/onlinedocs/5.3.0/
+    TOOLS = ['mingw']
+
+    # 一般的编译选项
+    COMPILE_FLAGS = ['-std=c++11', '-Wall', '-Wextra']
+    # 附加的 Release 编译选项
+    # https://gcc.gnu.org/onlinedocs/gcc-6.3.0/gcc/Optimize-Options.html
+    RELEASE_COMPILE_FLAGS = ['-D NDEBUG', '-O2']
+    # 附加的 Debug 编译选项
+    # https://gcc.gnu.org/onlinedocs/gcc-6.3.0/gcc/Debugging-Options.html
+    DEBUG_COMPILE_FLAGS = ['-D DEBUG', '-g']
+
+    # 一般的连接选项
+    # https://gcc.gnu.org/onlinedocs/gcc-6.3.0/gcc/Link-Options.html
+    LINK_FLAGS = ['-static-libstdc++', '-lboost_system', '-lzmq']
+    # 附加的 Release 连接选项
+    RELEASE_LINK_FLAGS = ['-s']
+    # 附加的 Debug 连接选项
+    DEBUG_LINK_FLAGS = ['']
+
+INCLUDE_PATH = [
+    'E:/Libraries/Boost/boost_1_63_0',
+    'E:/Libraries/ZeroMQ/libzmq/include',
+    'E:/Libraries/ZeroMQ/cppzmq',
+    ]
+LIB_PATH = [
+    'E:/Libraries/Boost/boost_1_63_0/stage/lib',
+    'E:/Libraries/ZeroMQ/libzmq/bin/x64/%s/v140/dynamic',
+    ]
+
+#### 项目设置结束 ####
+
+src_dir = os.curdir
+SRC_EXT = os.extsep + SRC_EXT.lower()
+
+release = ARGUMENTS.get('release') == '1'
+if release:
+    build_dir = os.path.normpath('build/release') + os.sep
+    bin_dir = os.path.normpath('bin/release') + os.sep
+    LIB_PATH[1] = LIB_PATH[1] % 'Release'
+else:
+    build_dir = os.path.normpath('build/debug') + os.sep
+    bin_dir = os.path.normpath('bin/debug') + os.sep
+    LIB_PATH[1] = LIB_PATH[1] % 'Debug'
+if not os.path.exists(build_dir):
+    os.makedirs(build_dir)
+if not os.path.exists(bin_dir):
+    os.makedirs(bin_dir)
+
+PROGRAM_NAME = bin_dir + PROGRAM_NAME 
+
+env = Environment(tools=TOOLS, CPPPATH=INCLUDE_PATH, LIBPATH=LIB_PATH,
+                  CPPFLAGS=COMPILE_FLAGS, LINKFLAGS=LINK_FLAGS)
+if release:
+    env.Append(CPPFLAGS=RELEASE_COMPILE_FLAGS, LINKFLAGS=RELEASE_LINK_FLAGS)
+else:
+    env.Append(CPPFLAGS=DEBUG_COMPILE_FLAGS, LINKFLAGS=DEBUG_LINK_FLAGS)
+
+src_paths = []
+for (dirpath, dirnames, filenames) in os.walk(src_dir):
+    src_paths.extend([os.path.join(dirpath, filename) for filename in filenames
+                      if filename.lower().endswith(SRC_EXT)])
+
+objects = []
+for src_path in src_paths:
+    target = build_dir + src_path[len(src_dir + os.sep):-len(SRC_EXT)] + '.o'
+    objects.append(env.Object(target, src_path))
+
+env.Program(PROGRAM_NAME, objects)
+
+def _display_build_finished():
+    import shutil
+    lib_dll_name = 'libzmq.dll'
+    lib_dll_path = os.path.join(LIB_PATH[1], lib_dll_name)
+    if os.path.exists(lib_dll_path) and not os.path.exists(os.path.join(bin_dir, lib_dll_name)):
+        shutil.copy(lib_dll_path, bin_dir)
+    print('Build finished !')
+
+atexit.register(_display_build_finished)
